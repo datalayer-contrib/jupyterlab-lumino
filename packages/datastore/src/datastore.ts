@@ -282,6 +282,10 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
       case 'queued-transaction':
         this._processQueue();
         break;
+      case 'datastore-gc-chance':
+        // We have an opportunity to garbage collect
+        // TODO: implement GC
+        break;
       default:
         break;
     }
@@ -572,6 +576,24 @@ namespace Datastore {
    */
   export type TransactionType = 'transaction' | 'undo' | 'redo';
 
+  /**
+   * A message of a datastore GC opportunity.
+   *
+   * You can send such a message to the datastore when you
+   * are sure that all concurrent transactions have been applied,
+   * i.e. any transactions that arrive later will have the current
+   * state as a base. This will provide  a hint to the datastore
+   * that it is safe to clean up some internal state.
+   */
+  export
+  class GCChanceMessage extends Message {
+    constructor() {
+      super('datastore-gc-chance');
+    }
+
+    readonly type: 'datastore-gc-chance';
+  }  
+  
   /**
    * An options object for initializing a datastore.
    */

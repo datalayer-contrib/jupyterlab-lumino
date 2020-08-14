@@ -269,6 +269,10 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
    */
   processMessage(msg: Message): void {
     switch(msg.type) {
+      case 'datastore-transaction':
+        console.log('---', msg);
+        this._queueTransaction((msg as any).transaction, 'transaction')
+        break;
       case 'transaction-begun':
         if (this._context.inTransaction) {
           console.warn(

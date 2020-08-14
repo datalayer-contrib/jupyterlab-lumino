@@ -109,6 +109,8 @@ class TextField extends Field<TextField.Value, TextField.Update, TextField.Metad
    * @returns The result of applying the patch.
    */
   applyPatch(args: Field.PatchArgs<TextField.Value, TextField.Patch, TextField.Metadata>): Field.PatchResult<TextField.Value, TextField.Change> {
+
+    console.log('--- applyPatch', args)
     // Unpack the arguments.
     let { previous, patch, metadata } = args;
 

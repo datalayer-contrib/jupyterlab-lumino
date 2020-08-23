@@ -268,10 +268,15 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
    * Handle a message.
    */
   processMessage(msg: Message): void {
+    console.log('--- lumino', msg)
     switch(msg.type) {
+      case 'remote-transaction':
+        const m2 = msg as Datastore.TransactionMessage;
+        this._applyTransaction(m2.transaction);
+        break;
       case 'datastore-transaction':
-        console.log('---', msg);
-        this._queueTransaction((msg as any).transaction, 'transaction')
+        const m = msg as Datastore.TransactionMessage;
+        this._applyTransaction(m.transaction);
         break;
       case 'transaction-begun':
         if (this._context.inTransaction) {
@@ -293,6 +298,60 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
       default:
         break;
     }
+  }
+
+
+  /**
+   * Apply a transaction to the datastore.
+   *
+   * @param transaction - The data of the transaction.
+   *
+   * @throws An exception if `apply` is called during a mutation.
+   *
+   * #### Notes
+   * If changes are made, the `changed` signal will be emitted.
+   */
+  private _applyTransaction(transaction: Datastore.Transaction, fromQueue=false): void {
+    if (!this._transactionQueue.isEmpty && !fromQueue) {
+      // We have queued transactions waiting to be applied.
+      // As we need to retain causal order of incoming transactions,
+      // we simply add the new one to the end of that queue.
+      this._queueTransaction(transaction, "transaction");
+      return
+    }
+
+    const {storeId, patch} = transaction;
+
+    try {
+      this._initTransaction(transaction.id, Math.max(this._context.version, transaction.version));
+    } catch (e) {
+      // Already in a transaction. Put transaction in queue to reapply later.
+      this._queueTransaction(transaction, "transaction");
+      return;
+    }
+    const change: Datastore.MutableChange = {};
+    try {
+      each(iterItems(patch), ([schemaId, tablePatch]) => {
+        const table = this._tables.get(schemaId, Private.recordIdCmp);
+        if (table === undefined) {
+          console.warn(
+            `Missing table for schema id '${
+              schemaId
+            }' in transaction '${transaction.id}'`);
+          this._finalizeTransaction();
+          return;
+        }
+        change[schemaId] = Table.patch(table, tablePatch);
+      });
+    } finally {
+      this._finalizeTransaction();
+    }
+    this._changed.emit({
+      storeId,
+      transactionId: transaction.id,
+      type: 'transaction',
+      change,
+    });
   }
 
   /**
@@ -579,6 +638,23 @@ namespace Datastore {
    * A type alias for kinds of transactions.
    */
   export type TransactionType = 'transaction' | 'undo' | 'redo';
+
+  /**
+   * A message of a datastore transaction.
+   */
+  export
+  class TransactionMessage extends Message {
+    constructor(transaction: Transaction) {
+      super('datastore-transaction');
+      this.transaction = transaction;
+    }
+    /**
+     * The transaction associated with the change.
+     */
+    readonly transaction: Transaction;
+
+    readonly type: 'datastore-transaction';
+  }
 
   /**
    * A message of a datastore GC opportunity.

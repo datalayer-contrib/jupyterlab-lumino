@@ -270,10 +270,12 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
   processMessage(msg: Message): void {
     console.log('--- lumino', msg)
     switch(msg.type) {
+/*
       case 'remote-transaction':
         const m2 = msg as Datastore.TransactionMessage;
         this._applyTransaction(m2.transaction);
         break;
+*/
       case 'datastore-transaction':
         const m = msg as Datastore.TransactionMessage;
         this._applyTransaction(m.transaction);

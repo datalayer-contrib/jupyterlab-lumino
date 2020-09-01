@@ -254,7 +254,8 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
     // Add the transation to the cemetery to indicate it is visible.
     this._cemetery[transactionId] = 1;
     // Emit a change signal
-    if (!Private.isChangeEmpty(this._context.change)) {
+    if (!Private.isChangeEmpty(change)) {
+      console.log('--- lumino datastore endTransaction change', change);
       this._changed.emit({
         storeId,
         transactionId,
@@ -268,16 +269,11 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
    * Handle a message.
    */
   processMessage(msg: Message): void {
-    console.log('--- lumino', msg)
+    console.log('--- lumino processMessage', msg);
     switch(msg.type) {
-/*
-      case 'remote-transaction':
-        const m2 = msg as Datastore.TransactionMessage;
-        this._applyTransaction(m2.transaction);
-        break;
-*/
       case 'datastore-transaction':
         const m = msg as Datastore.TransactionMessage;
+//        this._processTransaction(m.transaction, 'transaction');
         this._applyTransaction(m.transaction);
         break;
       case 'transaction-begun':
@@ -348,12 +344,15 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
     } finally {
       this._finalizeTransaction();
     }
-    this._changed.emit({
-      storeId,
-      transactionId: transaction.id,
-      type: 'transaction',
-      change,
-    });
+    if (!Private.isChangeEmpty(change)) {
+      console.log('--- lumino datastore _processTransaction change', change);
+      this._changed.emit({
+        storeId,
+        transactionId: transaction.id,
+        type: 'transaction',
+        change,
+      });
+    }
   }
 
   /**
@@ -534,6 +533,7 @@ class Datastore implements IDisposable, IIterable<Table<Schema>>, IMessageHandle
       this._finalizeTransaction();
     }
     if (!Private.isChangeEmpty(change)) {
+      console.log('--- lumino datastore _processTransaction change', change);
       this._changed.emit({
         storeId,
         transactionId: transaction.id,
